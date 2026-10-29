@@ -1,0 +1,34 @@
+
+[
+  {
+    "id": "doc_001",
+    "question": "What factors does the Q3 product strategy recommend considering when prioritizing products?",
+    "expected_intent": "documents",
+    "expected_keywords": [
+      "customer satisfaction",
+      "customer feedback",
+      "product reliability"
+    ]
+  },
+  {
+    "id": "sql_001",
+    "question": "List the products available in the product database.",
+    "expected_intent": "sql",
+    "expected_keywords": []
+  },
+  {
+    "id": "both_001",
+    "question": "Using the product data in the database and the Q3 product strategy document, what should guide product prioritization?",
+    "expected_intent": "both",
+    "expected_keywords": [
+      "customer feedback",
+      "product reliability"
+    ]
+  },
+  {
+    "id": "general_001",
+    "question": "Explain what a database index is in simple terms.",
+    "expected_intent": "general",
+    "expected_keywords": []
+  }
+]
