@@ -23,6 +23,9 @@ services:
 
   qdrant:
     image: qdrant/qdrant:latest
+    environment:
+      QDRANT_URL: http://qdrant:6333
+      QDRANT_COLLECTION: datanexus_documents
     container_name: datanexus-qdrant
     restart: unless-stopped
     ports:
@@ -38,6 +41,8 @@ services:
 
   api:
     build: .
+    env_file:
+      - .env
     container_name: datanexus-api
     restart: unless-stopped
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
