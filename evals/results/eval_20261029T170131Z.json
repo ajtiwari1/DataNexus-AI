@@ -1,0 +1,74 @@
+{
+  "timestamp": "2026-10-29T17:01:31.684560+00:00",
+  "total_cases": 4,
+  "routing_accuracy": 0.75,
+  "mean_keyword_coverage": 0.5,
+  "execution_success_rate": 0.75,
+  "results": [
+    {
+      "id": "doc_001",
+      "question": "What factors does the Q3 product strategy recommend considering when prioritizing products?",
+      "expected_intent": "documents",
+      "predicted_intent": "documents",
+      "routing_correct": true,
+      "answer": "The Q3 product strategy recommends considering the following factors when prioritizing products:\n\n- **Sales performance** and **customer feedback** (explicitly cited as inputs for prioritization decisions)\n- **Customer demand**\n- **Product reliability**\n- **Customer satisfaction**\n- **Improving the experience for existing customers**\n\nThe strategy also notes that **revenue alone is not sufficient** and should not be the sole criterion.  \n*Source: Product Strategy Q3*",
+      "expected_keywords": [
+        "customer satisfaction",
+        "customer feedback",
+        "product reliability"
+      ],
+      "matched_keywords": [
+        "customer satisfaction",
+        "customer feedback",
+        "product reliability"
+      ],
+      "keyword_coverage": 1.0,
+      "errors": [],
+      "execution_success": true
+    },
+    {
+      "id": "sql_001",
+      "question": "List the products available in the product database.",
+      "expected_intent": "sql",
+      "predicted_intent": "sql",
+      "routing_correct": true,
+      "answer": "Here are the products available in the database:\n\n| Product ID | Product Name | Category | Unit Price |\n|------------|--------------|----------|------------|\n| 1 | Analytics Platform | Software | $1,200.00 |\n| 2 | Data Integration Suite | Software | $850.00 |\n| 3 | Enterprise Support | Services | $300.00 |\n| 4 | Document Intelligence | AI Services | $1,500.00 |\n\nTotal: 4 products found.",
+      "expected_keywords": [],
+      "matched_keywords": [],
+      "keyword_coverage": null,
+      "errors": [],
+      "execution_success": true
+    },
+    {
+      "id": "both_001",
+      "question": "Using the product data in the database and the Q3 product strategy document, what should guide product prioritization?",
+      "expected_intent": "both",
+      "predicted_intent": "error",
+      "routing_correct": false,
+      "answer": "",
+      "expected_keywords": [
+        "customer feedback",
+        "product reliability"
+      ],
+      "matched_keywords": [],
+      "keyword_coverage": 0.0,
+      "errors": [
+        "ValueError: {'message': 'Provider returned an empty response', 'code': 502, 'metadata': {'error_type': 'provider_unavailable'}}"
+      ],
+      "execution_success": false
+    },
+    {
+      "id": "general_001",
+      "question": "Explain what a database index is in simple terms.",
+      "expected_intent": "general",
+      "predicted_intent": "general",
+      "routing_correct": true,
+      "answer": "A database index is like the index at the back of a book. Instead of scanning every page to find a topic, you look at the index to go directly to the right page. Similarly, a database index allows the system to find specific rows quickly without searching through the entire table.",
+      "expected_keywords": [],
+      "matched_keywords": [],
+      "keyword_coverage": null,
+      "errors": [],
+      "execution_success": true
+    }
+  ]
+}
