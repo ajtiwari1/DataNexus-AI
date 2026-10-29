@@ -220,3 +220,56 @@ The current graph uses a shared state to pass information between nodes. Its mai
 - `question`: original user query
 - `intent`: supervisor routing decision
 - `sql_result`: structured-data result
+- `document_result`: document-grounded result
+- `final_answer`: response returned by the workflow
+- `errors`: errors reported by individual agents
+
+For questions requiring both SQL and document context, the graph can execute the two specialized agents in parallel. The state reducer for `errors` supports combining error lists from parallel branches.
+
+## Security and Reliability
+
+Current design goals include:
+
+- Read-only database credentials for SQL access
+- Restricted SQL execution through database tools
+- Environment-based secret configuration
+- Error reporting from individual agent branches
+- Grounding document answers in retrieved context
+- Automated regression tests for routing and answer behavior
+
+A production deployment should additionally validate SQL restrictions, enforce query timeouts and resource limits, authenticate API clients, redact sensitive trace data, and test failure handling before exposing the service to untrusted users.
+
+## Evaluation and Observability
+
+The evaluation framework is being built to measure:
+
+- Supervisor routing accuracy
+- Retrieval precision and recall
+- Answer faithfulness and correctness
+- Execution success rate
+- Regressions after prompt, model, or retrieval changes
+
+Langfuse integration is intended to provide trace-level visibility into workflow execution, model calls, latency, and failures.
+
+Keyword coverage is used only as an initial regression signal; it is not a substitute for semantic correctness or groundedness evaluation.
+
+## Roadmap
+
+- [x] FastAPI service and Docker-based development environment
+- [x] PostgreSQL database and MCP tool integration
+- [x] Supervisor-driven LangGraph workflow
+- [x] SQL and document RAG agent paths
+- [x] Qdrant document indexing and retrieval
+- [x] Verified end-to-end Langfuse tracing
+- [ ] Expanded RAG and answer-quality evaluation
+- [ ] CI-based evaluation regression checks
+- [ ] Authentication, rate limiting, and production hardening
+- [ ] More advanced agent interoperability using A2A where independently deployed agents require it
+
+## Development Philosophy
+
+DataNexus AI is designed to evolve from a local multi-agent application into a scalable enterprise platform. Development prioritizes clear agent boundaries, explicit shared state, controlled tool access, measurable quality, and observable execution over simply adding more agents.
+
+## License
+
+Add a license before publishing the repository for reuse. Until then, usage and redistribution rights are governed by the repository owner's terms.
