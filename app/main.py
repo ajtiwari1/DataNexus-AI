@@ -10,6 +10,7 @@ from app.rag.store import ingest_document
 from pydantic import BaseModel
 from app.agents.sql_agent import ask_sql_agent
 from app.graph.workflow import workflow
+from app.observability.tracing import run_traced_workflow
 
 
 class ChatRequest(BaseModel):
@@ -51,23 +52,29 @@ def ready() -> dict[str, str]:
 async def chat_sql(request: ChatRequest):
     answer = await ask_sql_agent(request.question)
     return {"answer": answer}
-
 @app.post("/chat")
 async def chat(request: ChatRequest):
-    result = await workflow.ainvoke({
-        "question": request.question,
-        "errors": [],
-    })
+    result = await run_traced_workflow(
+        workflow=workflow,
+        question=request.question,
+    )
 
     return {
         "question": request.question,
         "intent": result.get("intent"),
         "answer": result.get(
             "final_answer",
-            result.get("sql_result", "No answer generated."),
+            result.get(
+                "sql_result",
+                result.get(
+                    "document_result",
+                    "No answer generated.",
+                ),
+            ),
         ),
         "errors": result.get("errors", []),
     }
+
 
 
 @app.post("/documents/ingest")

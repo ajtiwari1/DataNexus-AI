@@ -21,6 +21,7 @@ dependencies = [
   "langchain-mcp-adapters",
   "qdrant-client",
   "fastembed",
+  "langfuse",
 ]
 
 [project.optional-dependencies]
