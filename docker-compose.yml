@@ -1,0 +1,76 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: datanexus-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-datanexus}
+      POSTGRES_USER: ${POSTGRES_USER:-datanexus_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local_admin_change_me}
+      POSTGRES_READER_USER: ${POSTGRES_READER_USER:-datanexus_reader}
+      POSTGRES_READER_PASSWORD: ${POSTGRES_READER_PASSWORD:-local_reader_change_me}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./sql/create_reader.sh:/docker-entrypoint-initdb.d/02-create-reader.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: datanexus-qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/6333'"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: .
+    container_name: datanexus-api
+    restart: unless-stopped
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://datanexus_admin:local_admin_change_me@postgres:5432/datanexus}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  mcp:
+    build: .
+    container_name: datanexus-postgres-mcp
+    restart: unless-stopped
+    command: ["python", "-m", "app.mcp_server.server"]
+    environment:
+      MCP_DATABASE_URL: ${MCP_DATABASE_URL:-postgresql://datanexus_reader:local_reader_change_me@postgres:5432/datanexus}
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: 8001
+    ports:
+      - "8001:8001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  qdrant_data:
