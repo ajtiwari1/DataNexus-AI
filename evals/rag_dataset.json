@@ -1,0 +1,11 @@
+
+[
+  {
+    "id": "rag_001",
+    "question": "What factors does the Q3 product strategy recommend considering when prioritizing products?",
+    "expected_answer": "Use the actual recommendations stated in the ingested Q3 product strategy document.",
+    "reference_context": [
+      "Paste the relevant, verified paragraph from the Q3 product strategy document here."
+    ]
+  }
+]

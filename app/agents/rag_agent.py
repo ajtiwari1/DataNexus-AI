@@ -23,6 +23,11 @@ def get_llm():
 async def rag_node(state: DataNexusState) -> dict:
     try:
         documents = retrieve_documents(state["question"])
+        retrieved_context = [
+                    doc["text"]
+                    for doc in documents
+                    if doc.get("text")
+                ]
 
         if not documents:
             return {
@@ -59,6 +64,7 @@ async def rag_node(state: DataNexusState) -> dict:
 
         return {
             "document_result": str(response.content),
+            "retrieved_context": retrieved_context,
         }
 
     except Exception as exc:
