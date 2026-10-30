@@ -1,12 +1,12 @@
 
 import os
 import logging
-
+import asyncio
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
 from app.security.pii_guard import mask_pii
-
+from app.core.config import SQL_AGENT_TIMEOUT
 from app.security.tool_guard import filter_allowed_tools
 
 logger = logging.getLogger(__name__)
@@ -83,15 +83,23 @@ async def build_sql_agent():
 
 async def ask_sql_agent(question: str) -> str:
     agent = await build_sql_agent()
-    
-    result = await agent.ainvoke(
-        {
-            "messages": [
-                {"role": "user", "content": question}
-            ]
-        }
-    )
-    result_content = result["messages"][-1].content
-    result_content = mask_pii(result_content)
+    try:
+        result = await asyncio.wait_for(
+            agent.ainvoke({
+                "messages": [
+                    {"role": "user", "content": question}
+                ]
+            }),
+            timeout=SQL_AGENT_TIMEOUT,
+        )
+        result_content = result["messages"][-1].content
+        result_content = mask_pii(result_content)
 
-    return result
+        return result
+
+    except asyncio.TimeoutError:
+        logger.error("SQL agent timed out")
+
+        return "SQL agent timed out. Please try again."
+    
+
