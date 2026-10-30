@@ -9,6 +9,6 @@ class DataNexusState(TypedDict, total=False):
     sql_result: str
     document_result: str
     final_answer: str
-
+    retrieved_context: list[str]
     # Multiple parallel agents may append errors.
     errors: Annotated[list[str], operator.add]
