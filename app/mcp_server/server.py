@@ -5,6 +5,8 @@ from typing import Any
 import psycopg
 from psycopg.rows import dict_row
 from mcp.server.fastmcp import FastMCP
+from app.security.sql_guard import validate_readonly_query
+from app.security.pii_guard import mask_pii
 
 MCP_HOST = os.getenv("MCP_HOST", "0.0.0.0")
 MCP_PORT = int(os.getenv("MCP_PORT", "8001"))
@@ -16,6 +18,7 @@ MAX_ROWS_HARD_LIMIT = 200
 STATEMENT_TIMEOUT_MS = 5000
 
 mcp = FastMCP("DataNexus PostgreSQL MCP", host=MCP_HOST, port=MCP_PORT)
+
 
 def _connect() -> psycopg.Connection[Any]:
     return psycopg.connect(
@@ -84,6 +87,13 @@ def run_readonly_query(query: str, max_rows: int = 100) -> dict[str, Any]:
         raise ValueError("Only one query without SQL comments is allowed")
     if not re.match(r"(?is)^(SELECT|WITH)\b", cleaned):
         raise ValueError("Only SELECT or WITH queries are allowed")
+    is_valid, reason = validate_readonly_query(query)
+
+    if not is_valid:
+        return {
+        "success": False,
+        "error": reason,
+        }
 
     with _connect() as conn:
         with conn.transaction():

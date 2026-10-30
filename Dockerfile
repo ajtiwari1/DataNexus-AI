@@ -4,5 +4,6 @@ WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY app ./app
 COPY evals ./evals
+COPY tests ./tests
 RUN pip install --upgrade pip && pip install .
 EXPOSE 8000 8001

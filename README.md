@@ -35,7 +35,7 @@ flowchart TD
 
     RAG --> RET[Qdrant Retrieval]
     RET --> V[(Qdrant Vector Store)]
-    RAG --> LLM[OpenRouter LLM]
+    RAG --> LLM[OPENAI LLM]
 
     SQL --> F[Final Response]
     RAG --> F
