@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field,field_validator
 import psycopg
 from app.core.config import settings
 import asyncio
@@ -11,10 +11,9 @@ from pydantic import BaseModel
 from app.agents.sql_agent import ask_sql_agent
 from app.graph.workflow import workflow
 from app.observability.tracing import run_traced_workflow
-
-
-class ChatRequest(BaseModel):
-    question: str = Field(min_length=1, max_length=5000)
+from app.schemas.chat import ChatRequest
+from fastapi import HTTPException
+from app.security.input_guard import validate_user_input
 
 
 class DocumentIngestRequest(BaseModel):
@@ -52,8 +51,20 @@ def ready() -> dict[str, str]:
 async def chat_sql(request: ChatRequest):
     answer = await ask_sql_agent(request.question)
     return {"answer": answer}
+
 @app.post("/chat")
 async def chat(request: ChatRequest):
+    check = validate_user_input(request.question)
+
+    if not check.allowed:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "Request rejected by security validation",
+                "reason": check.reason,
+            },
+        )
+
     result = await run_traced_workflow(
         workflow=workflow,
         question=request.question,
