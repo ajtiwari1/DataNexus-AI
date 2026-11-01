@@ -9,6 +9,7 @@ class Settings(BaseSettings):
 settings = Settings()
 
 
+
 SQL_AGENT_TIMEOUT = float(
     os.getenv("SQL_AGENT_TIMEOUT", "30")
 )
@@ -23,4 +24,9 @@ WORKFLOW_TIMEOUT = float(
 
 LLM_TIMEOUT = float(
     os.getenv("LLM_TIMEOUT", "20")
+
 )
+FALLBACK_ENABLED = os.getenv("FALLBACK_ENABLED", "true").lower() == "true"
+=======
+)
+
