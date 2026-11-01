@@ -27,6 +27,4 @@ LLM_TIMEOUT = float(
 
 )
 FALLBACK_ENABLED = os.getenv("FALLBACK_ENABLED", "true").lower() == "true"
-=======
-)
 
