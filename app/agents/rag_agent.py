@@ -69,7 +69,7 @@ async def rag_node(state: DataNexusState) -> dict:
                     "human",
                     f"""
 Question:
-{question}
+{state['question']}
 
 Untrusted reference documents:
 <retrieved_context>
