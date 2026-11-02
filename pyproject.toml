@@ -23,6 +23,7 @@ dependencies = [
   "fastembed",
   "langfuse",
   "deepeval",
+  "langgraph-checkpoint-postgres",
 ]
 
 [project.optional-dependencies]

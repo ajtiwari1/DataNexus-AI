@@ -1,275 +1,438 @@
 # DataNexus AI
-
 ### Enterprise Data Intelligence Multi-Agent Platform
 
-DataNexus AI is a production-oriented multi-agent platform for answering enterprise questions using structured databases and unstructured documents. It combines SQL-based data access, retrieval-augmented generation (RAG), and supervisor-driven agent orchestration in a single API.
+**DataNexus AI** is an enterprise-oriented multi-agent platform built with **LangGraph, MCP, RAG, PostgreSQL, and Qdrant**. It enables users to interact with structured and unstructured enterprise data through natural language.
 
-The project is being developed incrementally, with a focus on reliability, observability, evaluation, and extensible agent architecture.
+The platform intelligently routes questions to specialized agents, retrieves information from databases and business documents, and combines their results into grounded responses.
+
+The goal is to build a scalable, reliable, and observable AI platform rather than a simple RAG chatbot.
+
+---
 
 ## Key Features
 
-- **Supervisor-based orchestration:** Uses LangGraph to classify incoming questions and route them to specialized agents.
-- **SQL agent:** Answers natural-language questions using structured PostgreSQL data through a read-only database tool.
-- **Document RAG agent:** Retrieves relevant document chunks from Qdrant and generates grounded answers using an LLM.
-- **Hybrid question handling:** Supports questions that require both structured database results and document context, with parallel agent execution.
-- **MCP integration:** Exposes database tools through a Model Context Protocol server.
-- **Document ingestion API:** Accepts document text, splits it into chunks, generates embeddings, and indexes the chunks in Qdrant.
-- **LLM provider configuration:** Supports an OpenAI-compatible API endpoint, configured for OpenRouter in the current setup.
-- **Evaluation and observability:** Langfuse tracing and automated evaluation are being developed.
+- **Multi-Agent Orchestration:** Supervisor-based agent routing using LangGraph.
+- **Natural Language to SQL:** Query structured PostgreSQL data using natural language.
+- **Document Intelligence:** Retrieve and analyze business documents using RAG.
+- **Hybrid Intelligence:** Combine SQL results and document evidence to answer complex questions.
+- **MCP Integration:** Connect agents to database capabilities through Model Context Protocol.
+- **Vector Search:** Use Qdrant for semantic document retrieval.
+- **Observability:** Trace agent execution and LLM interactions using Langfuse.
+- **RAG Evaluation:** Evaluate retrieval quality, faithfulness, and answer relevance using DeepEval.
+- **Security:** Input validation, SQL restrictions, tool allowlisting, and PII masking.
+- **Execution Reliability:** Timeouts, retries, fallback handling, and agent failure isolation.
+- **Human-in-the-Loop:** Planned approval workflow for sensitive operations.
+
+---
 
 ## Architecture
 
 ```mermaid
 flowchart TD
-    U[Client] --> API[FastAPI]
-    API --> S[LangGraph Supervisor]
+    A[User Query] --> B[FastAPI]
+    B --> C[LangGraph Supervisor]
 
-    S -->|SQL question| SQL[SQL Agent]
-    S -->|Document question| RAG[RAG Agent]
-    S -->|Both sources| SQL
-    S -->|Both sources| RAG
-    S -->|General question| G[General Response Node]
+    C --> D{Intent Classification}
 
-    SQL --> MCP[MCP Database Tools]
-    MCP --> DB[(PostgreSQL)]
+    D -->|SQL| E[SQL Agent]
+    D -->|Documents| F[RAG Agent]
+    D -->|Both| E
+    D -->|Both| F
+    D -->|General| G[General Agent]
 
-    RAG --> RET[Qdrant Retrieval]
-    RET --> V[(Qdrant Vector Store)]
-    RAG --> LLM[OPENAI LLM]
+    E --> H[MCP Client]
+    H --> I[MCP PostgreSQL Server]
+    I --> J[(PostgreSQL)]
 
-    SQL --> F[Final Response]
-    RAG --> F
-    G --> END[API Response]
-    F --> END
+    F --> K[Embedding Model]
+    K --> L[(Qdrant Vector Database)]
+
+    E --> M[State Aggregation]
+    F --> M
+    M --> N[Final Synthesis Agent]
+
+    G --> O[Response]
+    N --> O
+
+    C -.-> P[Langfuse Observability]
+    N -.-> P
 ```
 
-### Request lifecycle
+### Agent Responsibilities
 
-1. The client sends a question to the FastAPI `/chat` endpoint.
-2. The supervisor classifies the question as `sql`, `documents`, `both`, or `general`.
-3. The graph invokes the appropriate agent or agents.
-4. The SQL agent accesses PostgreSQL through read-only MCP tools.
-5. The RAG agent retrieves relevant chunks from Qdrant and generates an answer grounded in the retrieved context.
-6. The workflow combines the available results and returns the answer with the selected intent and any reported errors.
+| Agent | Responsibility |
+|---|---|
+| Supervisor | Classifies user intent and routes requests |
+| SQL Agent | Generates and executes read-only SQL queries through MCP |
+| RAG Agent | Retrieves relevant documents and generates grounded answers |
+| General Agent | Handles general conversational queries |
+| Finalize Agent | Combines SQL and document results |
+
+### Supported Query Types
+
+**1. SQL Query**
+
+Example:
+
+> List the top 10 customers by revenue.
+
+The supervisor routes the request to the SQL agent, which accesses PostgreSQL through MCP.
+
+**2. Document Query**
+
+Example:
+
+> What were the main reasons for the revenue decline?
+
+The RAG agent retrieves relevant business documents from Qdrant and generates an evidence-based answer.
+
+**3. Hybrid Query**
+
+Example:
+
+> Compare Q3 revenue performance with the reasons mentioned in business reports.
+
+The supervisor routes the request to both SQL and RAG agents.
+
+Both agents execute concurrently, update their respective state fields, and pass their results to the final synthesis agent.
+
+---
 
 ## Technology Stack
 
 | Component | Technology |
 |---|---|
-| API | FastAPI |
-| Agent orchestration | LangGraph |
-| LLM integration | LangChain OpenAI-compatible client |
-| LLM provider | OpenRouter |
-| Structured data | PostgreSQL |
-| Database tool integration | Model Context Protocol (MCP) |
-| Vector database | Qdrant |
-| Embeddings | FastEmbed, BGE-small-en-v1.5 |
-| Containers | Docker Compose |
-| Observability | Langfuse — integration in progress |
-| Evaluation | Custom regression runner — in progress |
+| Backend API | FastAPI |
+| Agent Orchestration | LangGraph |
+| LLM Integration | LangChain, OpenAI-compatible API |
+| LLM Provider | OpenRouter |
+| Database | PostgreSQL |
+| Vector Database | Qdrant |
+| Embeddings | FastEmbed |
+| Agent Communication | Model Context Protocol (MCP) |
+| Observability | Langfuse |
+| Evaluation | DeepEval |
+| Validation | Pydantic |
+| Containerization | Docker, Docker Compose |
+| Testing | Pytest |
+
+---
 
 ## Project Structure
 
 ```text
 datanexus-ai/
+│
 ├── app/
 │   ├── agents/
-│   │   ├── rag_agent.py
-│   │   └── ...
-│   ├── core/
+│   │   ├── sql_agent.py
+│   │   └── rag_agent.py
+│   │
 │   ├── graph/
 │   │   ├── state.py
 │   │   ├── nodes.py
 │   │   └── workflow.py
-│   ├── mcp_server/
-│   │   └── server.py
-│   ├── observability/
-│   │   └── tracing.py
+│   │
 │   ├── rag/
 │   │   └── store.py
+│   │
+│   ├── mcp_server/
+│   │   └── server.py
+│   │
+│   ├── security/
+│   │   ├── input_guard.py
+│   │   ├── tool_guard.py
+│   │   ├── sql_guard.py
+│   │   └── pii_guard.py
+│   │
+│   ├── core/
+│   │   ├── config.py
+│   │   └── retry.py
+│   │
+│   ├── schemas/
+│   │   └── chat.py
+│   │
 │   └── main.py
+│
 ├── sql/
-├── tests/
+│   ├── init.sql
+│   └── create_reader.sh
+│
 ├── evals/
-│   ├── dataset.json
-│   ├── run_eval.py
 │   └── results/
-├── .env.example
+│
+├── tests/
+│
 ├── docker-compose.yml
 ├── Dockerfile
-└── pyproject.toml
+├── pyproject.toml
+├── .env.example
+├── .gitignore
+└── README.md
 ```
 
-The exact contents may evolve as implementation progresses.
+*The structure above represents the main project modules; additional files may be present as development progresses.*
 
-## Prerequisites
+---
 
-- Docker Desktop with Docker Compose
-- An OpenRouter API key and a supported model ID
-- A Langfuse project and API keys if enabling tracing
-- Internet access for pulling container images and downloading the embedding model on first use
+## Getting Started
 
-## Setup
+### Prerequisites
+
+- Python 3.11+
+- Docker Desktop
+- Docker Compose
+- OpenRouter API key
 
 ### 1. Clone the repository
 
 ```bash
-git clone <your-repository-url>
+git clone https://github.com/ajtiwari1/datanexus-ai.git
+
 cd datanexus-ai
 ```
 
 ### 2. Configure environment variables
 
-Copy the example environment file:
-
-```bash
-cp .env.example .env
-```
-
-Configure the relevant values in `.env`:
+Create a `.env` file:
 
 ```dotenv
+# PostgreSQL
 POSTGRES_DB=datanexus
 POSTGRES_USER=datanexus_admin
-POSTGRES_PASSWORD=replace_with_a_strong_password
+POSTGRES_PASSWORD=change_me
 
 POSTGRES_READER_USER=datanexus_reader
-POSTGRES_READER_PASSWORD=replace_with_a_reader_password
+POSTGRES_READER_PASSWORD=change_me
 
-MCP_DATABASE_URL=postgresql://datanexus_reader:replace_with_a_reader_password@postgres:5432/datanexus
-
+# LLM Configuration
 OPENAI_API_KEY=your_openrouter_api_key
 OPENAI_BASE_URL=https://openrouter.ai/api/v1
-OPENAI_MODEL=your_exact_openrouter_model_id
+OPENAI_MODEL=your_model_id
 
+# MCP
+MCP_URL=http://mcp:8001/mcp
+
+# Qdrant
 QDRANT_URL=http://qdrant:6333
-QDRANT_COLLECTION=datanexus_documents
 
-LANGFUSE_ENABLED=false
-LANGFUSE_PUBLIC_KEY=
-LANGFUSE_SECRET_KEY=
+# Execution Timeouts
+SQL_AGENT_TIMEOUT=30
+RAG_AGENT_TIMEOUT=30
+WORKFLOW_TIMEOUT=60
+LLM_TIMEOUT=20
+
+# Langfuse
+LANGFUSE_ENABLED=true
+LANGFUSE_PUBLIC_KEY=your_public_key
+LANGFUSE_SECRET_KEY=your_secret_key
 LANGFUSE_BASE_URL=https://cloud.langfuse.com
 ```
 
-Use the actual environment variables expected by your current code. Keep `.env` out of version control and never commit API keys or production credentials.
+Use strong local credentials and never commit `.env` or API keys to GitHub.
 
-### 3. Start the services
+### 3. Start services
 
 ```bash
 docker compose up --build -d
 ```
 
-Check the running containers:
+Check running containers:
 
 ```bash
 docker compose ps
-docker compose logs --tail=100 api
 ```
 
-### 4. Open the API documentation
+### 4. Check API health
 
-Visit:
+```bash
+curl http://localhost:8000/health
+```
 
-- Swagger UI: http://localhost:8000/docs
-- Health endpoint: http://localhost:8000/health
-- Readiness endpoint: http://localhost:8000/ready
+### 5. Open API documentation
 
-These URLs assume the default local port mappings are configured.
+```text
+http://localhost:8000/docs
+```
+
+---
 
 ## API Usage
 
-### Ask a question
+### Chat Endpoint
 
-**Endpoint:** `POST /chat`
-
-Example request:
-
-```json
-{
-  "question": "What factors does the Q3 product strategy recommend considering when prioritizing products?"
-}
-```
-
-The response includes the question, detected intent, generated answer, and any reported errors.
-
-### Ingest a document
-
-**Endpoint:** `POST /documents/ingest`
+**POST** `/chat`
 
 Example request:
 
 ```json
 {
-  "title": "Product Strategy Q3",
-  "text": "Product teams should consider customer satisfaction, sales performance, customer feedback, and product reliability when prioritizing products."
+  "question": "Compare Q3 revenue performance with the reasons mentioned in business reports."
 }
 ```
 
-The service chunks the text, generates embeddings, and indexes the chunks in Qdrant.
+The supervisor determines whether the request requires SQL, document retrieval, or both.
 
-### Query structured data
+### Document Ingestion
 
-**Endpoint:** `POST /chat/sql`
+**POST** `/documents/ingest`
 
-Use this endpoint for natural-language questions about the seeded PostgreSQL data. The SQL agent should operate through a read-only database role.
+Example request:
 
-## Multi-Agent Design
+```json
+{
+  "title": "Q3 Business Report",
+  "text": "The company experienced a decline in revenue due to lower sales..."
+}
+```
 
-The current graph uses a shared state to pass information between nodes. Its main fields include:
+Documents are split into chunks, embedded, and stored in Qdrant for semantic retrieval.
 
-- `question`: original user query
-- `intent`: supervisor routing decision
-- `sql_result`: structured-data result
-- `document_result`: document-grounded result
-- `final_answer`: response returned by the workflow
-- `errors`: errors reported by individual agents
+---
 
-For questions requiring both SQL and document context, the graph can execute the two specialized agents in parallel. The state reducer for `errors` supports combining error lists from parallel branches.
+## MCP Integration
 
-## Security and Reliability
+DataNexus AI uses the Model Context Protocol to expose PostgreSQL database capabilities to the SQL agent.
 
-Current design goals include:
+The MCP server provides tools such as:
 
-- Read-only database credentials for SQL access
-- Restricted SQL execution through database tools
-- Environment-based secret configuration
-- Error reporting from individual agent branches
-- Grounding document answers in retrieved context
-- Automated regression tests for routing and answer behavior
+- `list_tables`
+- `describe_table`
+- `run_readonly_query`
 
-A production deployment should additionally validate SQL restrictions, enforce query timeouts and resource limits, authenticate API clients, redact sensitive trace data, and test failure handling before exposing the service to untrusted users.
+The SQL agent discovers available tools dynamically and filters them through an explicit allowlist.
+
+Database access uses a dedicated read-only account. Application-level SQL validation provides an additional security layer.
+
+---
+
+## RAG Pipeline
+
+The document retrieval pipeline consists of:
+
+1. Document ingestion.
+2. Text chunking.
+3. Embedding generation.
+4. Vector storage in Qdrant.
+5. Semantic retrieval.
+6. Context construction.
+7. LLM-based grounded answer generation.
+
+Retrieved documents are treated as untrusted reference data and cannot override system instructions.
+
+---
+
+## Reliability and Security
+
+The platform incorporates several defensive mechanisms:
+
+| Area | Implementation |
+|---|---|
+| Input validation | Pydantic validation |
+| Tool security | MCP tool allowlisting |
+| SQL security | Read-only SQL validation and database permissions |
+| PII protection | Pattern-based PII masking |
+| Timeout management | Async execution timeouts |
+| Retry handling | Exponential backoff |
+| Fallback handling | Partial-result fallback |
+| Failure isolation | Independent SQL and RAG error handling |
+| State aggregation | LangGraph reducers |
+
+These application-level controls complement infrastructure security and database permissions.
+
+---
 
 ## Evaluation and Observability
 
-The evaluation framework is being built to measure:
+### DeepEval
 
-- Supervisor routing accuracy
-- Retrieval precision and recall
-- Answer faithfulness and correctness
-- Execution success rate
-- Regressions after prompt, model, or retrieval changes
+The RAG evaluation pipeline uses metrics including:
 
-Langfuse integration is intended to provide trace-level visibility into workflow execution, model calls, latency, and failures.
+- Faithfulness
+- Answer Relevancy
+- Contextual Precision
+- Contextual Recall
+- Contextual Relevancy
 
-Keyword coverage is used only as an initial regression signal; it is not a substitute for semantic correctness or groundedness evaluation.
+Evaluation reports are stored under `evals/results/`.
 
-## Roadmap
+### Langfuse
 
-- [x] FastAPI service and Docker-based development environment
-- [x] PostgreSQL database and MCP tool integration
-- [x] Supervisor-driven LangGraph workflow
-- [x] SQL and document RAG agent paths
-- [x] Qdrant document indexing and retrieval
-- [x] Verified end-to-end Langfuse tracing
-- [ ] Expanded RAG and answer-quality evaluation
-- [ ] CI-based evaluation regression checks
-- [ ] Authentication, rate limiting, and production hardening
-- [ ] More advanced agent interoperability using A2A where independently deployed agents require it
+Langfuse is used to inspect:
 
-## Development Philosophy
+- LLM calls
+- Agent execution traces
+- Latency
+- Token usage
+- Workflow execution behavior
 
-DataNexus AI is designed to evolve from a local multi-agent application into a scalable enterprise platform. Development prioritizes clear agent boundaries, explicit shared state, controlled tool access, measurable quality, and observable execution over simply adding more agents.
+The objective is to make agent behavior observable and support systematic evaluation.
+
+---
+
+## Development Roadmap
+
+| Phase | Description | Status |
+|---|---|---|
+| Phase 1 | Backend, PostgreSQL, MCP infrastructure | Completed |
+| Phase 2 | LangGraph supervisor and multi-agent orchestration | Completed |
+| Phase 2B | Qdrant-based RAG integration | Implemented |
+| Phase 3 | Observability and evaluation foundation | Completed |
+| Phase 4 | Baseline and RAG evaluation improvements | Completed |
+| Phase 5A | Input validation and security guardrails | Completed |
+| Phase 5B | Agent execution reliability | Completed |
+| Phase 5C | Human-in-the-Loop approval workflow | In Progress |
+
+### Upcoming Enhancements
+
+- Persistent LangGraph checkpointing.
+- Human approval API and approval dashboard.
+- Separate SQL generation and execution stages.
+- More advanced SQL parsing and authorization policies.
+- MCP and A2A interoperability.
+- Large-scale synthetic enterprise datasets.
+- Advanced agent evaluation and performance benchmarking.
+
+---
+
+## Running Tests
+
+Run the complete test suite:
+
+```bash
+pytest tests/ -v
+```
+
+Run a specific test module:
+
+```bash
+pytest tests/test_parallel_workflow.py -v
+```
+
+---
+
+## Design Principles
+
+DataNexus AI is designed around the following principles:
+
+1. **Modularity:** Each agent has a well-defined responsibility.
+2. **Grounded Responses:** Answers should be supported by retrieved data.
+3. **Controlled Tool Access:** Agents can only use explicitly permitted tools.
+4. **Fault Tolerance:** Individual agent failures should not unnecessarily fail the entire workflow.
+5. **Observability:** Agent execution should be traceable and measurable.
+6. **Scalability:** The architecture should support additional agents, tools, and data sources.
+
+---
+
+## Author
+
+**Ajay Tiwari**
+
+- GitHub: [@ajtiwari1](https://github.com/ajtiwari1)
+- Portfolio: [ajtiwari1.github.io](https://ajtiwari1.github.io)
+
+---
 
 ## License
 
-Add a license before publishing the repository for reuse. Until then, usage and redistribution rights are governed by the repository owner's terms.
+This project is intended as an engineering and learning project. Add a suitable open-source license before distributing it publicly.
