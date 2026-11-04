@@ -21,7 +21,7 @@ The goal is to build a scalable, reliable, and observable AI platform rather tha
 - **RAG Evaluation:** Evaluate retrieval quality, faithfulness, and answer relevance using DeepEval.
 - **Security:** Input validation, SQL restrictions, tool allowlisting, and PII masking.
 - **Execution Reliability:** Timeouts, retries, fallback handling, and agent failure isolation.
-- **Human-in-the-Loop:** Planned approval workflow for sensitive operations.
+- **Human-in-the-Loop:** Review generated SQL and approve or reject it before execution.
 
 ---
 
@@ -40,16 +40,18 @@ flowchart TD
     D -->|Both| J
     D -->|General| K[General Agent]
 
-    E --> F[SQL Query State]
-    F --> G[SQL Execution]
-    G --> H[MCP Client]
-    H --> I[MCP PostgreSQL Server]
-    I --> L[(PostgreSQL)]
+    E --> F[SQL Validation]
+    F --> G{Human Approval}
+    G -->|Approve| H[SQL Execution]
+    G -->|Reject| Q[Response]
+    H --> I[MCP Client]
+    I --> J[MCP PostgreSQL Server]
+    J --> L[(PostgreSQL)]
 
     J --> M[Embedding Model]
     M --> N[(Qdrant Vector Database)]
 
-    G --> O[State Aggregation]
+    H --> O[State Aggregation]
     J --> O
     O --> P[Final Synthesis Agent]
 
@@ -66,7 +68,8 @@ flowchart TD
 |---|---|
 | Supervisor | Classifies user intent and routes requests |
 | SQL generation | Inspects schema and produces a query without database execution |
-| SQL execution | Sends the generated query to the read-only MCP query tool |
+| SQL validation and approval | Rejects non-read-only SQL and pauses for human review |
+| SQL execution | Runs only an approved query through the read-only MCP query tool |
 | RAG Agent | Retrieves relevant documents and generates grounded answers |
 | General Agent | Handles general conversational queries |
 | Finalize Agent | Combines SQL and document results |
@@ -276,6 +279,26 @@ Example request:
 ```
 
 The supervisor determines whether the request requires SQL, document retrieval, or both.
+For SQL requests, the response pauses with `status: "approval_required"` and
+includes the proposed SQL, a `request_id`, and a one-time `approval_token`.
+Submit that token to exactly one of the following endpoints:
+
+```bash
+curl -X POST http://localhost:8000/approvals/<request_id>/approve \
+  -H 'Content-Type: application/json' \
+  -d '{"approval_token":"<approval_token>"}'
+
+curl -X POST http://localhost:8000/approvals/<request_id>/reject \
+  -H 'Content-Type: application/json' \
+  -d '{"approval_token":"<approval_token>"}'
+```
+
+Approval resumes the workflow and executes the validated read-only query;
+rejection resumes it without executing SQL. `/chat/sql` uses the same approval
+flow but forces SQL routing. Approval checkpoints currently use in-memory
+storage, so pending requests are lost if the API process restarts. Configure
+persistent PostgreSQL checkpointing before using this across restarts or
+multiple API workers. The approval token is a bearer capability; keep it secret.
 
 ### Document Ingestion
 
@@ -394,11 +417,11 @@ The objective is to make agent behavior observable and support systematic evalua
 
 | Task | Description | Status |
 |---|---|---|
-| 5C.2 | Separate SQL generation from execution | In Progress |
-| 5C.3 | Add SQL validation and approval policy | Planned |
-| 5C.4 | Add LangGraph interrupt and resume support | Planned |
+| 5C.2 | Separate SQL generation from execution | Completed |
+| 5C.3 | Add SQL validation and approval policy | Completed |
+| 5C.4 | Add LangGraph interrupt and resume support | Completed |
 | 5C.5 | Add a persistent PostgreSQL checkpointer | Planned |
-| 5C.6 | Add FastAPI approval and rejection endpoints | Planned |
+| 5C.6 | Add FastAPI approval and rejection endpoints | Completed |
 | 5C.7 | Add approval authorization, audit logging, and tests | Planned |
 
 ### Upcoming Enhancements

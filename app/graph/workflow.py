@@ -1,15 +1,18 @@
 
 from langgraph.graph import END, START, StateGraph
+from langgraph.checkpoint.memory import MemorySaver
 
 from app.graph.nodes import (
     finalize_node,
     general_node,
     sql_execution_node,
     sql_generation_node,
+    sql_validation_node,
     supervisor_node,
 )
 from app.agents.rag_agent import rag_node
 from app.graph.state import DataNexusState
+from app.security.approval import approval_node
 
 
 def route_by_intent(state: DataNexusState):
@@ -29,14 +32,28 @@ def route_by_intent(state: DataNexusState):
 
 
 def route_after_sql_generation(state: DataNexusState) -> str:
-    return "sql_execution" if state.get("sql_query") else "finalize"
+    return "sql_validation" if state.get("sql_query") else "finalize"
 
 
-def build_workflow():
+def route_after_sql_validation(state: DataNexusState) -> str:
+    return "sql_approval" if state.get("pending_approval") else "finalize"
+
+
+def route_after_approval(state: DataNexusState) -> str:
+    return (
+        "sql_execution"
+        if state.get("approval_status") == "approved"
+        else "finalize"
+    )
+
+
+def build_workflow(checkpointer=None):
     graph = StateGraph(DataNexusState)
 
     graph.add_node("supervisor", supervisor_node)
     graph.add_node("sql_generation", sql_generation_node)
+    graph.add_node("sql_validation", sql_validation_node)
+    graph.add_node("sql_approval", approval_node)
     graph.add_node("sql_execution", sql_execution_node)
     graph.add_node("rag_agent", rag_node)
     graph.add_node("general", general_node)
@@ -54,6 +71,22 @@ def build_workflow():
         "sql_generation",
         route_after_sql_generation,
         {
+            "sql_validation": "sql_validation",
+            "finalize": "finalize",
+        },
+    )
+    graph.add_conditional_edges(
+        "sql_validation",
+        route_after_sql_validation,
+        {
+            "sql_approval": "sql_approval",
+            "finalize": "finalize",
+        },
+    )
+    graph.add_conditional_edges(
+        "sql_approval",
+        route_after_approval,
+        {
             "sql_execution": "sql_execution",
             "finalize": "finalize",
         },
@@ -63,7 +96,7 @@ def build_workflow():
     graph.add_edge("finalize", END)
     graph.add_edge("general", END)
 
-    return graph.compile()
+    return graph.compile(checkpointer=checkpointer or MemorySaver())
 
 
 workflow = build_workflow()
