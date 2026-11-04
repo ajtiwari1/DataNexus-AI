@@ -6,6 +6,7 @@ from typing import Annotated, Literal, TypedDict
 class DataNexusState(TypedDict, total=False):
     question: str
     intent: Literal["sql", "documents", "both", "general"]
+    sql_query: str
     sql_result: str
     document_result: str
     final_answer: str

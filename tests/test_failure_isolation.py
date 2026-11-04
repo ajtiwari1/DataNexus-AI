@@ -1,39 +1,27 @@
 import pytest
 
-from app.graph.nodes import sql_node, rag_node_wrapper
+from app.graph.nodes import sql_generation_node
 
 
 @pytest.mark.asyncio
-async def test_sql_failure_does_not_affect_rag(monkeypatch):
-    async def fail_sql(question):
+async def test_sql_generation_failure_is_reported(monkeypatch):
+    async def fail_generation(question):
+        assert question == "Why did revenue decline?"
         raise RuntimeError("SQL unavailable")
 
-    async def successful_rag(state):
-        return {
-            "document_result": "Revenue declined due to lower sales.",
-            "retrieved_context": ["Sales report"],
-        }
-
     monkeypatch.setattr(
-        "app.graph.nodes.ask_sql_agent",
-        fail_sql,
-    )
-    monkeypatch.setattr(
-        "app.graph.nodes.rag_node",
-        successful_rag,
+        "app.graph.nodes.generate_sql_query",
+        fail_generation,
     )
 
-    state = {
+    result = await sql_generation_node({
         "question": "Why did revenue decline?",
         "intent": "both",
         "errors": [],
-    }
+    })
 
-    sql_result, rag_result = await asyncio.gather(
-        sql_node(state),
-        rag_node_wrapper(state),
+    assert result["sql_query"] == ""
+    assert any(
+        "SQL query generation failed" in error
+        for error in result["errors"]
     )
-
-    assert sql_result["sql_result"] == ""
-    assert rag_result["document_result"]
-    assert any("SQL agent failed" in e for e in sql_result["errors"])

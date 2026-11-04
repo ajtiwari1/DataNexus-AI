@@ -34,28 +34,30 @@ flowchart TD
 
     C --> D{Intent Classification}
 
-    D -->|SQL| E[SQL Agent]
-    D -->|Documents| F[RAG Agent]
+    D -->|SQL| E[SQL Generation]
+    D -->|Documents| J[RAG Agent]
     D -->|Both| E
-    D -->|Both| F
-    D -->|General| G[General Agent]
+    D -->|Both| J
+    D -->|General| K[General Agent]
 
-    E --> H[MCP Client]
+    E --> F[SQL Query State]
+    F --> G[SQL Execution]
+    G --> H[MCP Client]
     H --> I[MCP PostgreSQL Server]
-    I --> J[(PostgreSQL)]
+    I --> L[(PostgreSQL)]
 
-    F --> K[Embedding Model]
-    K --> L[(Qdrant Vector Database)]
+    J --> M[Embedding Model]
+    M --> N[(Qdrant Vector Database)]
 
-    E --> M[State Aggregation]
-    F --> M
-    M --> N[Final Synthesis Agent]
+    G --> O[State Aggregation]
+    J --> O
+    O --> P[Final Synthesis Agent]
 
-    G --> O[Response]
-    N --> O
+    K --> Q[Response]
+    P --> Q
 
-    C -.-> P[Langfuse Observability]
-    N -.-> P
+    C -.-> R[Langfuse Observability]
+    P -.-> R
 ```
 
 ### Agent Responsibilities
@@ -63,7 +65,8 @@ flowchart TD
 | Agent | Responsibility |
 |---|---|
 | Supervisor | Classifies user intent and routes requests |
-| SQL Agent | Generates and executes read-only SQL queries through MCP |
+| SQL generation | Inspects schema and produces a query without database execution |
+| SQL execution | Sends the generated query to the read-only MCP query tool |
 | RAG Agent | Retrieves relevant documents and generates grounded answers |
 | General Agent | Handles general conversational queries |
 | Finalize Agent | Combines SQL and document results |
@@ -76,7 +79,8 @@ Example:
 
 > List the top 10 customers by revenue.
 
-The supervisor routes the request to the SQL agent, which accesses PostgreSQL through MCP.
+The SQL generation stage creates a query, then a separate execution stage sends it
+to PostgreSQL through the read-only MCP tool.
 
 **2. Document Query**
 
@@ -300,7 +304,10 @@ The MCP server provides tools such as:
 - `describe_table`
 - `run_readonly_query`
 
-The SQL agent discovers available tools dynamically and filters them through an explicit allowlist.
+The SQL generation stage discovers schema tools dynamically and filters them through
+an explicit allowlist. It does not receive the query execution tool; a separate
+execution stage invokes `run_readonly_query` after generation. The MCP server
+validates each query before execution.
 
 Database access uses a dedicated read-only account. Application-level SQL validation provides an additional security layer.
 
@@ -383,12 +390,19 @@ The objective is to make agent behavior observable and support systematic evalua
 | Phase 5B | Agent execution reliability | Completed |
 | Phase 5C | Human-in-the-Loop approval workflow | In Progress |
 
+### Phase 5C Tasks
+
+| Task | Description | Status |
+|---|---|---|
+| 5C.2 | Separate SQL generation from execution | In Progress |
+| 5C.3 | Add SQL validation and approval policy | Planned |
+| 5C.4 | Add LangGraph interrupt and resume support | Planned |
+| 5C.5 | Add a persistent PostgreSQL checkpointer | Planned |
+| 5C.6 | Add FastAPI approval and rejection endpoints | Planned |
+| 5C.7 | Add approval authorization, audit logging, and tests | Planned |
+
 ### Upcoming Enhancements
 
-- Persistent LangGraph checkpointing.
-- Human approval API and approval dashboard.
-- Separate SQL generation and execution stages.
-- More advanced SQL parsing and authorization policies.
 - MCP and A2A interoperability.
 - Large-scale synthetic enterprise datasets.
 - Advanced agent evaluation and performance benchmarking.
