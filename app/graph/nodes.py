@@ -6,6 +6,7 @@ from langchain_openai import ChatOpenAI
 
 from app.agents.sql_agent import execute_sql_query, generate_sql_query
 from app.graph.state import DataNexusState
+from app.security.sql_guard import validate_readonly_query
 
 
 def get_llm():
@@ -21,6 +22,9 @@ def get_llm():
 
 
 async def supervisor_node(state: DataNexusState) -> dict:
+    if state.get("intent") in {"sql", "documents", "both", "general"}:
+        return {"intent": state["intent"]}
+
     response = await get_llm().ainvoke([
         (
             "system",
@@ -58,6 +62,12 @@ async def sql_generation_node(state: DataNexusState) -> dict:
 
 
 async def sql_execution_node(state: DataNexusState) -> dict:
+    if state.get("approval_status") != "approved":
+        return {
+            "sql_result": "",
+            "errors": ["SQL execution blocked because approval was not granted."],
+        }
+
     try:
         result = await execute_sql_query(state["sql_query"])
         return {"sql_result": result}
@@ -67,6 +77,22 @@ async def sql_execution_node(state: DataNexusState) -> dict:
             "sql_result": "",
             "errors": [f"SQL query execution failed: {type(exc).__name__}"],
         }
+
+
+def sql_validation_node(state: DataNexusState) -> dict:
+    valid, reason = validate_readonly_query(state["sql_query"])
+    if not valid:
+        return {
+            "pending_approval": False,
+            "approval_status": "invalid",
+            "approval_reason": reason,
+        }
+
+    return {
+        "pending_approval": True,
+        "approval_status": "pending",
+        "approval_reason": reason,
+    }
 
 
 async def general_node(state: DataNexusState) -> dict:
@@ -86,6 +112,18 @@ async def finalize_node(state: DataNexusState) -> dict:
     document_result = state.get("document_result", "")
     intent = state.get("intent", "general")
     errors = state.get("errors", [])
+    approval_status = state.get("approval_status")
+
+    if approval_status == "rejected":
+        return {"final_answer": "The SQL query was rejected and not executed."}
+
+    if approval_status == "invalid":
+        return {
+            "final_answer": (
+                "The generated SQL did not pass read-only validation: "
+                f"{state.get('approval_reason', 'Invalid SQL query')}"
+            )
+        }
 
     # Return the specialist's answer directly for single-source requests.
     if intent == "sql":

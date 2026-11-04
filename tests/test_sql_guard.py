@@ -23,6 +23,8 @@ def test_valid_queries(query):
         "UPDATE customers SET name = 'test'",
         "SELECT * FROM customers; DROP TABLE customers",
         "INSERT INTO customers VALUES (1, 'test')",
+        "SELECT * FROM customers;",
+        "SELECT * FROM customers -- comment",
     ],
 )
 def test_invalid_queries(query):

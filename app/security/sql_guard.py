@@ -18,9 +18,11 @@ def validate_readonly_query(query: str) -> tuple[bool, str]:
     if not re.match(r"^(SELECT|WITH)\b", normalized, re.IGNORECASE):
         return False, "Only SELECT queries are allowed"
 
-    # Reject multiple statements
-    if ";" in normalized.rstrip(";"):
-        return False, "Multiple SQL statements are not allowed"
+    if ";" in normalized:
+        return False, "Semicolons are not allowed"
+
+    if any(marker in normalized for marker in ("--", "/*", "*/")):
+        return False, "SQL comments are not allowed"
 
     # Reject write or administrative operations
     if FORBIDDEN_SQL.search(normalized):

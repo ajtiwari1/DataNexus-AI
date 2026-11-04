@@ -29,37 +29,52 @@ def get_langfuse_client():
 async def run_traced_workflow(
     workflow: Any,
     question: str,
+    config: dict | None = None,
+    state: dict | None = None,
 ) -> dict:
     client = get_langfuse_client()
+    workflow_input = state or {"question": question}
 
     if client is None:
-        return await workflow.ainvoke({"question": question})
+        return await workflow.ainvoke(
+            workflow_input,
+            config=config,
+        )
 
     try:
         from langfuse.langchain import CallbackHandler
 
         handler = CallbackHandler()
-
-        with client.start_as_current_observation(
-            as_type="span",
-            name="datanexus-chat",
-            input={"question": question},
-        ) as span:
-            result = await workflow.ainvoke(
-                {"question": question},
-                config={"callbacks": [handler]},
-            )
-
-            span.update(
-                output={
-                    "answer": result.get("final_answer", ""),
-                    "intent": result.get("intent", "unknown"),
-                    "errors": result.get("errors", []),
-                }
-            )
-
-            return result
-
     except Exception:
-        logger.exception("Tracing integration failed; running workflow without tracing")
-        return await workflow.ainvoke({"question": question})
+        logger.exception("Could not initialize Langfuse tracing")
+        return await workflow.ainvoke(
+            workflow_input,
+            config=config,
+        )
+
+    run_config = dict(config or {})
+    run_config["callbacks"] = [
+        *run_config.get("callbacks", []),
+        handler,
+    ]
+
+    with client.start_as_current_observation(
+        as_type="span",
+        name="datanexus-chat",
+        input={"question": question},
+    ) as span:
+        result = await workflow.ainvoke(
+            workflow_input,
+            config=run_config,
+        )
+
+        span.update(
+            output={
+                "answer": result.get("final_answer", ""),
+                "intent": result.get("intent", "unknown"),
+                "errors": result.get("errors", []),
+                "approval_status": result.get("approval_status"),
+            }
+        )
+
+        return result
