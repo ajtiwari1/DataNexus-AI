@@ -4,8 +4,7 @@ import os
 
 from langchain_openai import ChatOpenAI
 
-from app.agents.sql_agent import ask_sql_agent
-from app.agents.rag_agent import rag_node
+from app.agents.sql_agent import execute_sql_query, generate_sql_query
 from app.graph.state import DataNexusState
 
 
@@ -46,15 +45,27 @@ async def supervisor_node(state: DataNexusState) -> dict:
     return {"intent": intent}
 
 
-async def sql_node(state: DataNexusState) -> dict:
+async def sql_generation_node(state: DataNexusState) -> dict:
     try:
-        result = await ask_sql_agent(state["question"])
+        query = await generate_sql_query(state["question"])
+        return {"sql_query": query}
+    except Exception as exc:
+        logging.exception("SQL query generation failed")
+        return {
+            "sql_query": "",
+            "errors": [f"SQL query generation failed: {type(exc).__name__}"],
+        }
+
+
+async def sql_execution_node(state: DataNexusState) -> dict:
+    try:
+        result = await execute_sql_query(state["sql_query"])
         return {"sql_result": result}
     except Exception as exc:
-        logging.exception("SQL agent failed")
+        logging.exception("SQL query execution failed")
         return {
             "sql_result": "",
-            "errors": [f"SQL agent failed: {type(exc).__name__}"],
+            "errors": [f"SQL query execution failed: {type(exc).__name__}"],
         }
 
 
